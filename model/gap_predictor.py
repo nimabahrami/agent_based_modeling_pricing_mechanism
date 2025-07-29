@@ -11,7 +11,6 @@ import warnings
 import joblib
 from pathlib import Path # Import Path
 
-# Suppress TensorFlow warnings for cleaner output
 tf.get_logger().setLevel('ERROR')
 warnings.filterwarnings('ignore')
 
@@ -29,25 +28,18 @@ class GapPredictor:
         
     def load_pretrained_model(self):
         """Load the pre-trained model if it exists."""
-        # Use the base_dir attribute to construct paths
+        
         model_path = os.path.join(self.base_dir, 'pretrained_models', 'gap_predictor_model.h5')
         scaler_path = os.path.join(self.base_dir, 'pretrained_models', 'gap_predictor_scaler.save')
         
         try:
             if os.path.exists(model_path) and os.path.exists(scaler_path):
                 print("Loading pre-trained gap predictor model...")
-                # We need to provide custom_objects when loading if using Bidirectional layer
-                # This is often necessary for custom layers or complex models
-                # For standard Bidirectional(LSTM), sometimes it loads correctly, but explicitly defining
-                # helps avoid issues. Let's add a try-except for this.
+                
                 try:
                      self.model = load_model(model_path)
                 except Exception as load_error:
                      print(f"Attempting load with custom_objects due to error: {load_error}")
-                     # Define custom objects if needed - for standard layers this might not be required
-                     # but it's a common practice if you have custom activations/layers
-                     # For Bidirectional, the underlying LSTM needs to be recognized
-                     
                      custom_objects = {'LSTM': LSTM, 'Bidirectional': Bidirectional}
                      self.model = load_model(model_path, custom_objects=custom_objects)
 
@@ -59,7 +51,6 @@ class GapPredictor:
                 print("No pre-trained model found. Please train the model first.")
         except Exception as e:
             print(f"Error loading pre-trained model: {e}")
-            # If loading fails, ensure model is None and not trained
             self.model = None
             self.is_trained = False
 
