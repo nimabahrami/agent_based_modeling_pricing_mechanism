@@ -6,6 +6,7 @@ from mesa.time import BaseScheduler
 from mesa.datacollection import DataCollector
 
 from model.data_reporters import *
+from model.agents import Member, Coordinator
 
 
 class EnergyCommunity(Model):
@@ -45,7 +46,13 @@ class EnergyCommunity(Model):
             self.uncertainties = uncertainties
 
         if start_date is None:
-            start_date = datetime.datetime(2021, 1, 1)
+            # Start from the second week of 2021 (January 8th)
+            start_date = datetime.datetime(2021, 8, 10)
+            self.is_default_start_date = True
+        else:
+            self.is_default_start_date = False
+            
+        self.start_date = start_date
         self.date = start_date.strftime('%Y-%m-%d')
         self.date_index = pd.date_range(start=self.date, periods=96, freq='15min')
 
@@ -55,10 +62,13 @@ class EnergyCommunity(Model):
         self.tick = 0
         self.tod_surplus_timing = None  # Time of day when surplus electricity is available
         self.tod_deficit_timing = None  # Time of day when electricity is needed from the grid
+        self.price_signal = None  # Dynamic price signal for the next day
         self.agent_list = agents_list
         self.schedule = BaseScheduler(self)
         self.all_assets = {}
         self.create_agents()
+        
+        # Add new metrics for auction and dynamic pricing
         self.datacollector = DataCollector(model_reporters={
             "date": get_date,
             # date or the time step for the model simulation
@@ -72,15 +82,78 @@ class EnergyCommunity(Model):
             # generation from the renewable assets in the simulation model
             "M5: savings_on_ToD": get_savings,
             # savings made by avoiding import of electricity from grid by community members
-            "M6: energy_costs": get_energy_cost
+            "M6: energy_costs": get_energy_cost,
             # total expenses made by community members for procuring electricity from the grid
+            "M7: auction_revenue": get_auction_revenue,
+            # revenue from the electricity auction (prosumers only)
+            "M7b: auction_cost": get_auction_cost,
+            # cost from the electricity auction (consumers only)
+            "M8: dynamic_flexibility": get_dynamic_flexibility,
+            # average dynamic flexibility of community members
+            "M9: cove_values": get_cove_values,
+            # COVE values of prosumers
+            "M10: lcoe_values": get_lcoe_values,
+            # LCOE values of prosumers
+            "M11: clearing_price": get_clearing_price,
+            # clearing price from auction
+            "M12: base_retail_price": get_average_base_retail_price,
+            # average base retail price
+            "M13: price_comparison_summary": get_price_comparison_summary,
+            # summary of all price metrics for comparison
+            "M14: generation_prediction_error": get_generation_prediction_error,
+            # generation prediction error from coordinator
+            "M15: demand_prediction_error": get_demand_prediction_error,
+            # demand prediction error from coordinator
+            "M16: auction_bids_offers": get_auction_bids_offers
+            # auction bids and offers data
         })
 
     def step(self):
         """Advance the model by one step."""
         super().step()
-        self.schedule.step()
+        
+        coordinator = self.get_coordinator()
+        if coordinator:
+            # 1. Coordinator sets price signal (and any other pre-auction logic)
+            coordinator.predict_gap_for_tomorrow()
+            coordinator.calculate_dynamic_prices()
+            if self.participation_in_tod is not None and self.participation_in_tod > 0:
+                coordinator.release_tod_schedule()
+            coordinator.auction.reset()
+
+        # 2. All agents prepare their bids/offers (and update demand/generation, etc.)
+        for agent in self.schedule.agents:
+            agent.update_date()
+            if isinstance(agent, (Member)):
+                agent.get_demand_schedule()
+                agent.get_generation_schedule()
+                agent.generate_day_ahead_schedules()
+                agent.adjust_schedule_for_captive_consumption()
+                agent.get_previous_days_generation_schedule()
+                agent.get_previous_days_price_schedule()
+                if hasattr(agent, "calculate_cove_and_flexibility"):
+                    agent.calculate_cove_and_flexibility()
+                if hasattr(agent, "prepare_auction_bid_offer"):
+                    agent.prepare_auction_bid_offer()
+                if hasattr(agent, "adjust_schedule_for_tod"):
+                    agent.adjust_schedule_for_tod()
+
+        # 3. Coordinator runs the auction and updates agent results
+        if coordinator:
+            coordinator.run_auction()
+
+        # 4. All agents compute their costs/earnings based on auction results
+        for agent in self.schedule.agents:
+            if hasattr(agent, "compute_energy_cost"):
+                agent.compute_energy_cost()
+            if hasattr(agent, "compute_earnings"):
+                agent.compute_earnings()
+                # agent.compute_earning_original()
+
+        # 5. Collect data
         self.datacollector.collect(self)
+        
+        # 6. Update date
         self.tick += 1
         self.date = self.tick_to_date(self.tick)
 
@@ -109,16 +182,15 @@ class EnergyCommunity(Model):
         elif member_type is MemberType.NON_RESIDENTIAL:
             demand_flexibility = self.levers['L3']
         return demand_flexibility
+        
+    def get_coordinator(self):
+        """Get the coordinator agent."""
+        for agent in self.schedule.agents:
+            if agent.agent_type is AgentType.COORDINATOR:
+                return agent
+        return None
 
-    def run_simulation(self, steps=365, time_tracking=False, debug=False):
-        """
-        Runs the model for a specific amount of steps.
-        :param steps: int: number of steps (in years)
-        :param time_tracking: Boolean
-        :param debug: Boolean
-        :return:
-            output: Dataframe: all information that the datacollector gathered
-        """
+    def run_simulation(self, steps=300, time_tracking=False, debug=False):
 
         start_time = time.time()
 
@@ -147,6 +219,6 @@ class EnergyCommunity(Model):
         """
         year = 2021
         days = tick
-        date = datetime.datetime(year, 1, 1) + datetime.timedelta(days - 1)
+        date = datetime.datetime(year, 2, 1) + datetime.timedelta(days - 1)
         date = date.strftime('%Y-%m-%d')
         return date
