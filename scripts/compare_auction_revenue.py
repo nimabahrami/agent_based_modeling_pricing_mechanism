@@ -4,7 +4,6 @@ import json
 import os
 import numpy as np
 
-# Helper to extract total revenue from stringified dicts
 def extract_total_revenue(revenue_series):
     total_revenue = []
     for rev_data in revenue_series:
@@ -19,7 +18,6 @@ def extract_total_revenue(revenue_series):
             total_revenue.append(0)
     return total_revenue
 
-# Helper to extract total generation from stringified lists/dicts
 def extract_total_generation(gen_series):
     total = 0
     for val in gen_series:
@@ -43,17 +41,13 @@ def extract_total_generation(gen_series):
             total += val
     return total
 
-# File paths
 normal_path = 'simulation_results/2024_solar/simulation_results_2024.csv'
 simple_path = 'simulation_results/simple_solar/simulation_results_simple.csv'
 dynamic_path = 'simulation_results/2021_solar/simulation_results_2021.csv'
-
-# Load results
 normal = pd.read_csv(normal_path)
 simple = pd.read_csv(simple_path)
 dynamic = pd.read_csv(dynamic_path)
 
-# --- 1. Auction revenue through steps (line plot) ---
 normal_revenue = extract_total_revenue(normal['M7: auction_revenue'])
 simple_revenue = extract_total_revenue(simple['M7: auction_revenue'])
 dynamic_revenue = extract_total_revenue(dynamic['M7: auction_revenue'])
@@ -77,8 +71,7 @@ plt.savefig(output_steps, dpi=300)
 plt.close()
 print(f"Stepwise comparison plot saved to: {output_steps}")
 
-# --- 2. Monthly average auction revenue (line plot) ---
-# Add total_revenue and date columns
+
 normal['total_revenue'] = normal_revenue
 simple['total_revenue'] = simple_revenue
 dynamic['total_revenue'] = dynamic_revenue
@@ -95,7 +88,7 @@ all_months = sorted(set(monthly_normal.index).union(set(monthly_simple.index)).u
 monthly_normal = monthly_normal.reindex(all_months, fill_value=0)
 monthly_simple = monthly_simple.reindex(all_months, fill_value=0)
 monthly_dynamic = monthly_dynamic.reindex(all_months, fill_value=0)
-# Use new color palette
+
 color_map = {'Normal Solar': '#1a2238', 'Simple Solar': '#E9967A', 'Dynamic Solar': '#0dcaf0'}
 plt.figure(figsize=(14, 7))
 plt.plot([str(m) for m in all_months], monthly_normal, marker='o', label='Normal Solar', color=color_map['Normal Solar'], linewidth=2)
@@ -112,7 +105,6 @@ plt.savefig(output_monthly, dpi=300)
 plt.close()
 print(f"Monthly average comparison plot saved to: {output_monthly}")
 
-# --- 3. Total revenue bar chart (keep as before) ---
 total_normal = sum(normal_revenue)
 total_simple = sum(simple_revenue)
 total_dynamic = sum(dynamic_revenue)
@@ -130,7 +122,6 @@ plt.savefig(output_total, dpi=300)
 plt.close()
 print(f"Total revenue comparison plot saved to: {output_total}")
 
-# Print and save totals
 print("\nTotal Auction Revenue:")
 print(f"Normal Solar: {total_normal:.2f} EUR")
 print(f"Simple Solar: {total_simple:.2f} EUR")
@@ -142,7 +133,6 @@ with open('simulation_results/auction_revenue_total_comparison_3.txt', 'w') as f
     f.write(f'Dynamic Solar: {total_dynamic:.2f} EUR\n')
 print("Total values saved to: simulation_results/auction_revenue_total_comparison_3.txt")
 
-# --- 4. Total generation bar chart ---
 total_gen_normal = extract_total_generation(normal['M4: total_generation'])
 total_gen_simple = extract_total_generation(simple['M4: total_generation'])
 total_gen_dynamic = extract_total_generation(dynamic['M4: total_generation'])
@@ -161,7 +151,6 @@ plt.savefig(output_gen, dpi=300)
 plt.close()
 print(f"Total generation comparison plot saved to: {output_gen}")
 
-# Print and save generation totals
 print("\nTotal Generation:")
 print(f"Normal Solar: {total_gen_normal:.2f} kWh")
 print(f"Simple Solar: {total_gen_simple:.2f} kWh")
@@ -173,9 +162,6 @@ with open('simulation_results/total_generation_comparison_3.txt', 'w') as f:
     f.write(f'Dynamic Solar: {total_gen_dynamic:.2f} kWh\n')
 print("Total generation values saved to: simulation_results/total_generation_comparison_3.txt")
 
-# --- 5. Monthly aggregated shifted load comparison (grouped bar chart) ---
-# Add support for 2024_solar if present
-import os
 shifted_paths = [
     ('Normal Solar', 'simulation_results/simulation_results.csv'),
     ('Simple Solar', 'simulation_results/simple_solar/simulation_results_simple.csv'),
@@ -209,7 +195,6 @@ for label, path in shifted_paths:
             monthly = df.groupby('month')['shifted'].sum()
             shifted_data[label] = monthly
 
-# Align all months
 all_months = sorted(set(m for series in shifted_data.values() for m in series.index))
 bar_width = 0.18
 x = np.arange(len(all_months))
