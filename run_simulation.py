@@ -1,10 +1,3 @@
-#!/usr/bin/env python3
-"""
-Script to run the Energy Community Model simulation.
-
-This script demonstrates how to set up and run the energy community model
-with different agent configurations and parameters.
-"""
 
 import os
 import sys
@@ -13,55 +6,43 @@ import numpy as np
 import shutil
 import matplotlib.pyplot as plt
 from datetime import datetime
-
-# Add the model directory to the path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
 from model.model_code import EnergyCommunity
 from model.community_setup import create_community_configuration
 from model.enumerations import *
 from model.day_ahead_prices import DayAheadPrices
 
 
-def create_example_levers():
-    """Create example lever configurations."""
-    
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+def create_example_levers():    
     levers = {
-        'L1': 0.7,  # Participation in Time-of-Day (ToD) demand response (70%)
-        'L2': 0.3,  # Residential demand flexibility (30%)
-        'L3': 0.4   # Non-residential demand flexibility (40%)
+        'L1': 0.7,
+        'L2': 0.3,
+        'L3': 0.4 
     }
-    
     return levers
 
 
 def create_example_uncertainties():
-    """Create example uncertainty configurations."""
-    
     uncertainties = {
-        'X1': 0.25,  # Minimum percentage of flexible demand available (25%)
-        'X2': 0.80,  # Maximum percentage of flexible demand available (80%)
-        'X3': 0.85   # Accuracy of day-ahead generation projections (85%)
+        'X1': 0.25,
+        'X2': 0.80, 
+        'X3': 0.85 
     }
     
     return uncertainties
 
 
 def display_step_price_metrics(model, step_num):
-    """Display price metrics for the current simulation step."""
-    
-    # Get the latest data from the model
     latest_data = model.datacollector.get_model_vars_dataframe().iloc[-1]
     
     print(f"\n--- Step {step_num + 1} Price Metrics ---")
     print(f"Date: {latest_data.get('date', 'N/A')}")
     
-    # Display clearing price
     if 'M11: clearing_price' in latest_data:
         clearing_price = latest_data['M11: clearing_price']
         print(f"Clearing Price: {clearing_price:.4f} EUR/kWh" if clearing_price is not None else "Clearing Price: N/A")
     
-    # Display base retail price
     if 'M12: base_retail_price' in latest_data:
         base_retail_price = latest_data['M12: base_retail_price']
         if base_retail_price is not None:
@@ -73,7 +54,6 @@ def display_step_price_metrics(model, step_num):
         else:
             print("Base Retail Price: N/A")
     
-    # Display LCOE summary
     if 'M10: lcoe_values' in latest_data:
         lcoe_data = latest_data['M10: lcoe_values']
         if isinstance(lcoe_data, str):
@@ -91,7 +71,6 @@ def display_step_price_metrics(model, step_num):
             except:
                 print("LCOE: Error parsing data")
     
-    # Display COVE summary
     if 'M9: cove_values' in latest_data:
         cove_data = latest_data['M9: cove_values']
         if isinstance(cove_data, str):
@@ -111,11 +90,7 @@ def display_step_price_metrics(model, step_num):
 
 
 def run_basic_simulation(cove_markup):
-    """Run a basic simulation with gridflex_heeten community configuration."""
-    
     print("Setting up Energy Community Model...")
-    
-    # Create configurations
     community_name = 'gridflex_heeten'
     agents_list = create_community_configuration(community_name=community_name)
     levers = create_example_levers()
@@ -128,11 +103,9 @@ def run_basic_simulation(cove_markup):
     print(f"Uncertainties: {uncertainties}")
     print(f"Start date: {start_date}")
     
-    # Get COVE markup from environment variable if available
     cove_markup = cove_markup
     print(f"COVE markup factor: {cove_markup}")
     
-    # Create and run the model
     print("\nCreating model...")
     model = EnergyCommunity(
         levers=levers,
@@ -142,21 +115,14 @@ def run_basic_simulation(cove_markup):
         cove_markup=cove_markup
     )
     
-    print("Running simulation...")
-    
-    # Run simulation with step-by-step price display
-    steps = 270  # Increased to 100 steps
+    steps = 270
     for step in range(steps):
         print(f'\nStep: {step + 1}')
         model.step()
-        
-        # Display price metrics every 5 steps or at the end
         if (step + 1) % 5 == 0 or step == steps - 1:
             display_step_price_metrics(model, step)
     
     print(f"\nSimulation completed!")
-    
-    # Get results
     results = model.datacollector.get_model_vars_dataframe()
     print(f"Results shape: {results.shape}")
     print(f"Date range: {results['date'].min()} to {results['date'].max()}")
@@ -165,8 +131,6 @@ def run_basic_simulation(cove_markup):
 
 
 def display_price_comparison(results, step=None):
-    """Display price comparison metrics for a specific step or the last step."""
-    
     if step is None:
         step = -1  # Last step
     
@@ -174,7 +138,6 @@ def display_price_comparison(results, step=None):
     print(f"PRICE COMPARISON METRICS (Step {step + 1})")
     print(f"{'='*60}")
     
-    # Get price comparison summary
     if 'M13: price_comparison_summary' in results.columns:
         price_summary = results['M13: price_comparison_summary'].iloc[step]
         if isinstance(price_summary, str):
@@ -196,7 +159,6 @@ def display_price_comparison(results, step=None):
                 print(f"  Min COVE: {summary_dict.get('min_cove', 'N/A'):.4f} EUR/kWh")
                 print(f"  Max COVE: {summary_dict.get('max_cove', 'N/A'):.4f} EUR/kWh")
                 
-                # Price comparison analysis
                 clearing_price = summary_dict.get('clearing_price')
                 base_retail_price = summary_dict.get('base_retail_price')
                 avg_lcoe = summary_dict.get('average_lcoe')
@@ -227,21 +189,15 @@ def display_price_comparison(results, step=None):
         print("Price comparison summary not available in results")
 
 
-def analyze_results(results):
-    """Analyze and display simulation results."""
-    
+def analyze_results(results):    
     print("\n" + "="*50)
     print("SIMULATION RESULTS ANALYSIS")
     print("="*50)
     
-    # Display basic statistics
     print(f"\nTotal simulation days: {len(results)}")
     print(f"Date range: {results['date'].min()} to {results['date'].max()}")
-    
-    # Display price comparison for the last step
     display_price_comparison(results)
     
-    # Analyze key metrics
     metrics_to_analyze = [
         'M1: realised_demand',
         'M2: scheduled_demand', 
@@ -274,42 +230,30 @@ def analyze_results(results):
 
 
 def plot_results(results):
-    """Create modern, clean standalone plots of key simulation results."""
-    
-    print("\nCreating modern standalone plots...")
-    
-    # Create output directory
     os.makedirs('simulation_results', exist_ok=True)
-    
-    # Drop first two steps for cleaner plots
     results_clean = results.iloc[2:].reset_index(drop=True)
     
-    # Set modern style
     plt.style.use('default')
     plt.rcParams['figure.facecolor'] = 'white'
     plt.rcParams['axes.facecolor'] = 'white'
     plt.rcParams['axes.edgecolor'] = '#E0E0E0'
     plt.rcParams['axes.linewidth'] = 0.8
-    plt.rcParams['grid.color'] = '#CCCCCC'  # Darker grid color
+    plt.rcParams['grid.color'] = '#CCCCCC'  
     plt.rcParams['grid.linestyle'] = '-'
-    plt.rcParams['grid.linewidth'] = 0.8     # Thicker grid lines
+    plt.rcParams['grid.linewidth'] = 0.8 
     plt.rcParams['font.size'] = 12
     plt.rcParams['axes.titlesize'] = 14
     plt.rcParams['axes.labelsize'] = 12
     plt.rcParams['xtick.labelsize'] = 10
     plt.rcParams['ytick.labelsize'] = 10
     
-    # Consistent color scheme
-    actual_color = '#000080'   # Navy blue
-    predicted_color = '#E9967A' # Dark salmon
+    actual_color = '#000080'
+    predicted_color = '#E9967A' 
     
-    # Plot 1: Daily Auction Revenue through steps
     plt.figure(figsize=(12, 8))
     if 'M7: auction_revenue' in results_clean.columns:
         revenue_data = results_clean['M7: auction_revenue']
-        step_numbers = range(3, len(results) + 1)  # Start from step 3
-        
-        # Extract daily total revenue for each step
+        step_numbers = range(3, len(results) + 1)
         total_revenue = []
         for i, rev_data in enumerate(revenue_data):
             if isinstance(rev_data, str):
@@ -335,13 +279,11 @@ def plot_results(results):
         print("Auction revenue plot saved to: simulation_results/auction_revenue_through_steps.png")
         plt.close()
     
-    # Plot 2: Daily shifted load through simulation steps
     plt.figure(figsize=(12, 8))
     if 'M3: shifted_load' in results_clean.columns and len(results_clean) > 0:
         shifted_data = results_clean['M3: shifted_load']
         step_numbers = range(3, len(results) + 1)  # Start from step 3
         
-        # Calculate daily total shifted load across all agents
         daily_shifted_load = []
         
         for shifted_step in shifted_data:
@@ -368,7 +310,7 @@ def plot_results(results):
         print("Shifted load plot saved to: simulation_results/shifted_load_by_agent.png")
         plt.close()
     
-    # Plot 3: Generation Prediction Error (24-hour detailed view)
+    
     plt.figure(figsize=(15, 8))
     if 'M14: generation_prediction_error' in results_clean.columns and len(results_clean) > 0:
         error_data = results_clean['M14: generation_prediction_error'].iloc[-1]
@@ -377,7 +319,7 @@ def plot_results(results):
             try:
                 import json
                 error_list = json.loads(error_data)
-                if len(error_list) == 96:  # Ensure we have 96 data points
+                if len(error_list) == 96: 
                     time_labels = [f"{i//4:02d}:{(i%4)*15:02d}" for i in range(96)]
                     plt.plot(time_labels, error_list, color=predicted_color, linewidth=2, marker='o', markersize=3, label='Generation Prediction Error')
                     plt.title('Generation Prediction Error - 24-Hour Detailed View (Last Simulation Day)', pad=20)
@@ -406,7 +348,6 @@ def plot_results(results):
             plt.savefig('simulation_results/generation_prediction_error.png', dpi=300, bbox_inches='tight', facecolor='white')
             plt.close()
     
-    # Plot 4: Demand Prediction Error (24-hour detailed view)
     plt.figure(figsize=(15, 8))
     if 'M15: demand_prediction_error' in results_clean.columns and len(results_clean) > 0:
         error_data = results_clean['M15: demand_prediction_error'].iloc[-1]
@@ -415,7 +356,7 @@ def plot_results(results):
             try:
                 import json
                 error_list = json.loads(error_data)
-                if len(error_list) == 96:  # Ensure we have 96 data points
+                if len(error_list) == 96: 
                     time_labels = [f"{i//4:02d}:{(i%4)*15:02d}" for i in range(96)]
                     plt.plot(time_labels, error_list, color=predicted_color, linewidth=2, marker='s', markersize=3, label='Demand Prediction Error')
                     plt.title('Demand Prediction Error - 24-Hour Detailed View (Last Simulation Day)', pad=20)
@@ -444,13 +385,11 @@ def plot_results(results):
             plt.savefig('simulation_results/demand_prediction_error.png', dpi=300, bbox_inches='tight', facecolor='white')
             plt.close()
     
-    # Plot 5: Bid/Offer Scatter Plot (all steps)
     plt.figure(figsize=(12, 8))
     if 'M16: auction_bids_offers' in results_clean.columns and len(results_clean) > 0:
         all_bids = []
         all_offers = []
         
-        # Collect all bids and offers across all simulation steps (starting from step 3)
         for step_idx, (date, auction_data) in enumerate(zip(results_clean['date'], results_clean['M16: auction_bids_offers'])):
             if isinstance(auction_data, str):
                 try:
@@ -459,13 +398,13 @@ def plot_results(results):
                     
                     for agent_id, data in auction_dict.items():
                         if 'bid' in data:
-                            all_bids.append((step_idx + 3, data['bid']['price']))  # Use step number starting from 3
+                            all_bids.append((step_idx + 3, data['bid']['price'])) 
                         if 'offer' in data:
-                            all_offers.append((step_idx + 3, data['offer']['price']))  # Use step number starting from 3
+                            all_offers.append((step_idx + 3, data['offer']['price']))
                 except:
                     continue
         
-        # Plot bids and offers
+
         if all_bids:
             bid_steps, bid_prices = zip(*all_bids)
             plt.scatter(bid_steps, bid_prices, color=actual_color, s=30, alpha=0.6, label='Bids', marker='o')
@@ -491,21 +430,15 @@ def plot_results(results):
         plt.savefig('simulation_results/bids_offers_scatter.png', dpi=300, bbox_inches='tight', facecolor='white')
         plt.close()
     
-    # Plot 6: Price Analysis for a Typical Day (96 quarterly intervals)
     plot_price_analysis_for_typical_day(results_clean)
     
-    # Save results to CSV
     results.to_csv('simulation_results/simulation_results.csv', index=False)
     print("Results saved to: simulation_results/simulation_results.csv")
     print("\nAll standalone plots created successfully!")
 
 
 def plot_price_analysis_for_typical_day(results):
-    """Create a comprehensive price analysis plot for a typical day with 96 quarterly intervals."""
     
-    print("\nCreating price analysis plot for typical day...")
-    
-    # Set modern style for this plot
     plt.style.use('default')
     plt.rcParams['figure.facecolor'] = 'white'
     plt.rcParams['axes.facecolor'] = 'white'
@@ -520,70 +453,50 @@ def plot_price_analysis_for_typical_day(results):
     plt.rcParams['xtick.labelsize'] = 10
     plt.rcParams['ytick.labelsize'] = 10
     
-    # Create single figure
     fig, ax = plt.subplots(1, 1, figsize=(15, 8))
-    
-    # Get a typical day (middle of the simulation)
     typical_day_idx = len(results) // 2
     typical_date = results['date'].iloc[typical_day_idx]
     
     print(f"Analyzing prices for typical day: {typical_date}")
-    
-    # Time labels for 96 quarterly intervals (15-minute intervals)
     time_labels = [f"{i//4:02d}:{(i%4)*15:02d}" for i in range(96)]
     
-    # Get day ahead prices for the typical day
     day_ahead_prices = DayAheadPrices()
     wholesale_prices = day_ahead_prices.get_day_ahead_prices(typical_date, as_series=False)
     
-    # Plot day ahead prices (wholesale prices) - Line plot
     ax.plot(time_labels, wholesale_prices, color='#2E86AB', linewidth=2, 
             marker='o', markersize=4, label='Day Ahead Price (Wholesale)', alpha=0.8)
     
-    # Get dynamic prices (signal prices) if available
     signal_prices = None
     if hasattr(results, 'dynamic_prices') and results['dynamic_prices'].iloc[typical_day_idx] is not None:
         signal_prices = results['dynamic_prices'].iloc[typical_day_idx]
     
-    # Plot signal prices if available - Line plot
     if signal_prices is not None:
         ax.plot(time_labels, signal_prices, color='#A23B72', linewidth=2, 
                 marker='s', markersize=4, label='Signal Price (Dynamic)', alpha=0.8)
     
-    # Set chart properties
     ax.set_title('Price Analysis for Typical Day - Day Ahead vs Signal Prices (96 Quarterly Intervals)', pad=20)
     ax.set_ylabel('Price (EUR/kWh)')
     ax.set_xlabel('Time of Day')
     ax.grid(True, alpha=0.6)
     ax.legend(loc='upper right')
-    ax.set_xticks(range(0, 96, 8), [time_labels[i] for i in range(0, 96, 8)], rotation=45)
-    
-    # Adjust layout and save
+    ax.set_xticks(range(0, 96, 8), [time_labels[i] for i in range(0, 96, 8)], rotation=45)    
     plt.tight_layout()
     plt.savefig('simulation_results/price_analysis_typical_day.png', dpi=300, bbox_inches='tight', facecolor='white')
     print("Price analysis plot saved to: simulation_results/price_analysis_typical_day.png")
     plt.close()
 
 
-
-
-
 def main():
-    """Main function to run the simulation."""
     
     print("Energy Community Model Simulation - Gridflex Heeten")
     print("="*50)
     
     try:
-        # Run the simulation
         cove_markup_factors = [1.0, 1.2, 1.4, 1.6, 1.8, 2.0]
         for i in cove_markup_factors:
             model, results = run_basic_simulation(i)
         
-        # Analyze results
-            analyze_results(results)
-            
-            # Create plots
+            analyze_results(results)    
             plot_results(results)        
             
             print("\n" + "="*50)
@@ -599,7 +512,6 @@ def main():
                         shutil.copy2(src, dst)
                     elif os.path.isdir(src):
                         shutil.copytree(src, dst, dirs_exist_ok=True)
-                print(f"✓ Results copied to {output_dir}")
             
             for file in os.listdir('simulation_results'):
                     src = os.path.join('simulation_results', file)
@@ -607,7 +519,6 @@ def main():
                         os.remove(src)
                     elif os.path.isdir(src):
                         shutil.rmtree(src)
-            print(f"✓ Cleaned up simulation_results folder")
         
         return model, results
         
